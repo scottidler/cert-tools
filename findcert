@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 SCRIPT="$0"
 TIMESTAMP=$(date "+%Y%m%d%H%M%S")
@@ -8,10 +8,10 @@ CMD=${3:-cp}
 CERT_NAME="$COMMON_NAME@$TIMESTAMP"
 
 declare -A EXTS
-EXTS=( ["x509"]="crt" ["req"]="csr" ["rsa"]="key" )
+EXTS=(["x509"]="crt" ["req"]="csr" ["rsa"]="key")
 
 if [ -z "$COMMON_NAME" ] || [[ "$@" == *"-h"* ]] || [[ "$@" == *"--help"* ]]; then
-    cat <<EOF
+	cat <<EOF
 usage: $SCRIPT [-h] common-name [cert-dir]
 
 positional args:
@@ -21,10 +21,10 @@ positional args:
 optional args:
     -h|--help       print this help message
 EOF
-    exit 1
+	exit 1
 fi
 
-read -d '' INTERMEDIATE << EOF
+read -d '' INTERMEDIATE <<EOF
 -----BEGIN CERTIFICATE-----
 MIIGSTCCBTGgAwIBAgIEM6qqqjANBgkqhkiG9w0BAQsFADBkMQswCQYDVQQGEwJV
 UzEVMBMGA1UEChMMRGlnaUNlcnQgSW5jMRkwFwYDVQQLExB3d3cuZGlnaWNlcnQu
@@ -63,14 +63,14 @@ OicqQ99N+q6YeAlhejLa7+7FkKYKK1YEAbE1Icc=
 -----END CERTIFICATE-----
 EOF
 
-true | openssl s_client -connect "$COMMON_NAME:443" 2>/dev/null | openssl x509 -in /dev/stdin > "$CERT_NAME.crt"
+true | openssl s_client -connect "$COMMON_NAME:443" 2>/dev/null | openssl x509 -in /dev/stdin >"$CERT_NAME.crt"
 modhash=$(openssl x509 -in "$CERT_NAME.crt" -modulus -noout | openssl md5 | awk '{print $2}')
 modhash_data=$(./modcert "$CERT_DIR" | grep "$modhash")
 
 # shellcheck disable=SC2034
 echo "$modhash_data" | while read modulus ssltype filename; do
-    ext="${EXTS[$ssltype]}"
-    "$CMD" "$filename" "$CERT_NAME.$ext"
+	ext="${EXTS[$ssltype]}"
+	"$CMD" "$filename" "$CERT_NAME.$ext"
 done
 
-echo "$INTERMEDIATE" >> "$CERT_NAME.crt"
+echo "$INTERMEDIATE" >>"$CERT_NAME.crt"

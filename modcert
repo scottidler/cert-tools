@@ -1,44 +1,44 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 VERBOSE=${VERBOSE:-false}
 MODCERT="$0"
-TARGETS=( "$@" )
+TARGETS=("$@")
 
 PWD="Proc-Type: 4,ENCRYPTED"
 
 for target in "${TARGETS[@]}"; do
-    modhash=""
-    if [ -d "$target" ]; then
-        $MODCERT "$(find "$target" -maxdepth 1 -mindepth 1 -print0 | xargs -0 echo)"
-        continue
-    elif [ -f "$target" ]; then
-        line="$(grep -F -- "-----BEGIN" "$target" | head -1)"
-        action=
-        modhash="|---non-openssl-related-file---|"
-        if [ -n "$line" ]; then
-            case "$line" in
-                "-----BEGIN CERTIFICATE REQUEST-----"*)
-                    action=req
-                    ;;
-                "-----BEGIN CERTIFICATE-----"*)
-                    action=x509
-                    ;;
-                "-----BEGIN RSA PRIVATE KEY-----"*)
-                    action=rsa
-                    ;;
-                "-----BEGIN PRIVATE KEY-----"*)
-                    action=rsa
-                    ;;
-            esac
-            modhash="|---unknown-openssl-file-type--|"
-            if [ -n "$action" ]; then
-                if [ "$action" == "rsa" ] && grep -Fxq -- "$PWD" "$target"; then
-                    modhash="|----password-protected-rsa----|"
-                else
-                    modhash="$(openssl "$action" -in "$target" -noout -modulus 2>/dev/null | md5sum | awk '{print $1}')"
-                fi
-            fi
-        fi
-    fi
-    printf "%s %-4s %s\n" "$modhash" "${action:-NULL}" "$target"
+	modhash=""
+	if [ -d "$target" ]; then
+		$MODCERT "$(find "$target" -maxdepth 1 -mindepth 1 -print0 | xargs -0 echo)"
+		continue
+	elif [ -f "$target" ]; then
+		line="$(grep -F -- "-----BEGIN" "$target" | head -1)"
+		action=
+		modhash="|---non-openssl-related-file---|"
+		if [ -n "$line" ]; then
+			case "$line" in
+			"-----BEGIN CERTIFICATE REQUEST-----"*)
+				action=req
+				;;
+			"-----BEGIN CERTIFICATE-----"*)
+				action=x509
+				;;
+			"-----BEGIN RSA PRIVATE KEY-----"*)
+				action=rsa
+				;;
+			"-----BEGIN PRIVATE KEY-----"*)
+				action=rsa
+				;;
+			esac
+			modhash="|---unknown-openssl-file-type--|"
+			if [ -n "$action" ]; then
+				if [ "$action" == "rsa" ] && grep -Fxq -- "$PWD" "$target"; then
+					modhash="|----password-protected-rsa----|"
+				else
+					modhash="$(openssl "$action" -in "$target" -noout -modulus 2>/dev/null | md5sum | awk '{print $1}')"
+				fi
+			fi
+		fi
+	fi
+	printf "%s %-4s %s\n" "$modhash" "${action:-NULL}" "$target"
 done

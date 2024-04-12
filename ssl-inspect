@@ -1,9 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # inspired by src: https://gist.github.com/gene1wood/6530100
 
 if [ -n "$DEBUG" ]; then
-    PS4=':${LINENO}+'
-    set -x
+	PS4=':${LINENO}+'
+	set -x
 fi
 
 SCRIPT_FILE="$0"
@@ -12,10 +12,10 @@ SCRIPT_PATH="$(dirname "$SCRIPT_FILE")"
 [ -L "$0" ] && SCRIPT_REAL="$(readlink "$0")"
 
 if [ -n "$VERBOSE" ]; then
-    echo "SCRIPT_FILE=$SCRIPT_FILE"
-    echo "SCRIPT_NAME=$SCRIPT_NAME"
-    echo "SCRIPT_PATH=$SCRIPT_PATH"
-    echo "SCRIPT_REAL=$SCRIPT_REAL"
+	echo "SCRIPT_FILE=$SCRIPT_FILE"
+	echo "SCRIPT_NAME=$SCRIPT_NAME"
+	echo "SCRIPT_PATH=$SCRIPT_PATH"
+	echo "SCRIPT_REAL=$SCRIPT_REAL"
 fi
 
 CRT="-----BEGIN CERTIFICATE-----"
@@ -28,111 +28,111 @@ TEXT=""
 ACTION=
 
 run() {
-    CMD="$1"
-    RC="${2:-0}"
-    if [ -n "$VERBOSE" ]; then
-        >&2 echo "$CMD"
-    fi
-    eval "$CMD"
+	CMD="$1"
+	RC="${2:-0}"
+	if [ -n "$VERBOSE" ]; then
+		echo >&2 "$CMD"
+	fi
+	eval "$CMD"
 }
 
 process() {
-    while read line; do
-        if [ -z "$TEXT" ]; then
-            if [ "$line" == "$CRT" ]; then
-                ACTION="x509"
-            elif [ "$line" == "$CSR" ]; then
-                ACTION="req"
-            elif [ "$line" == "$KEY" ]; then
-                ACTION="rsa"
-            fi
-            TEXT="$line\n"
-        else
-            TEXT="$TEXT$line\n"
-        fi
-    done < "$1"
+	while read line; do
+		if [ -z "$TEXT" ]; then
+			if [ "$line" == "$CRT" ]; then
+				ACTION="x509"
+			elif [ "$line" == "$CSR" ]; then
+				ACTION="req"
+			elif [ "$line" == "$KEY" ]; then
+				ACTION="rsa"
+			fi
+			TEXT="$line\n"
+		else
+			TEXT="$TEXT$line\n"
+		fi
+	done <"$1"
 }
 
 host_cmd() {
-    ACTION="x509"
-    if [[ "$1" == *":"* ]]; then
-        HOST="${1%%:*}"
-        PORT="${1#*:}"
-    else
-        HOST="$1"
-        PORT="443"
-    fi
-    if [[ $(host "$HOST") != *"not found"* ]]; then
-        echo "echo -n | openssl s_client -connect $HOST:$PORT -servername $HOST 2> /dev/null | openssl $ACTION $OPENSSL_ARGS"
-        return
-    fi
-    >&2 echo "host $HOST, port $PORT not found!"
-    exit 1
+	ACTION="x509"
+	if [[ "$1" == *":"* ]]; then
+		HOST="${1%%:*}"
+		PORT="${1#*:}"
+	else
+		HOST="$1"
+		PORT="443"
+	fi
+	if [[ $(host "$HOST") != *"not found"* ]]; then
+		echo "echo -n | openssl s_client -connect $HOST:$PORT -servername $HOST 2> /dev/null | openssl $ACTION $OPENSSL_ARGS"
+		return
+	fi
+	echo >&2 "host $HOST, port $PORT not found!"
+	exit 1
 }
 
 file_cmd() {
-    if [ -n "$TEXT" ] && [ -n "$ACTION" ]; then
-        echo "printf '%b' \"\$TEXT\" | openssl $ACTION $OPENSSL_ARGS"
-        return 0
-    fi
-    >&2 echo "openssl $ACTION failed on file input!"
-    exit 1
+	if [ -n "$TEXT" ] && [ -n "$ACTION" ]; then
+		echo "printf '%b' \"\$TEXT\" | openssl $ACTION $OPENSSL_ARGS"
+		return 0
+	fi
+	echo >&2 "openssl $ACTION failed on file input!"
+	exit 1
 }
 
 inspect() {
-    if [ ! -t 0 ] && [ -z "$1" ]; then
-        process /dev/stdin
-        CMD="$(file_cmd)"
-    else
-        if [ -f "$1" ]; then
-            process "$1"
-            CMD="$(file_cmd)"
-        else
-            CMD="$(host_cmd "$1")"
-        fi
-    fi
-    run "$CMD"
+	if [ ! -t 0 ] && [ -z "$1" ]; then
+		process /dev/stdin
+		CMD="$(file_cmd)"
+	else
+		if [ -f "$1" ]; then
+			process "$1"
+			CMD="$(file_cmd)"
+		else
+			CMD="$(host_cmd "$1")"
+		fi
+	fi
+	run "$CMD"
 }
 
 sans() {
-    run "$SCRIPT_PATH/ssl-inspect $1" | awk '/X509v3 Subject Alternative Name/ {getline; print}' | sed 's/[ \t]*DNS://g' | tr ',' '\n'
+	run "$SCRIPT_PATH/ssl-inspect $1" | awk '/X509v3 Subject Alternative Name/ {getline; print}' | sed 's/[ \t]*DNS://g' | tr ',' '\n'
 }
 
 validity() {
-    run "$SCRIPT_PATH/ssl-inspect $1" | awk '/Validity/ {getline; print; getline; print;}' | sed 's/^[ \t]*//'
+	run "$SCRIPT_PATH/ssl-inspect $1" | awk '/Validity/ {getline; print; getline; print;}' | sed 's/^[ \t]*//'
 }
 
 compare() {
-    if [ -z "$1" ] || [ -z "$2" ]; then
-        >&2 echo "compare requires two args"
-        exit 1
-    fi
-    diff <(run "$SCRIPT_PATH/ssl-inspect $1") <(run "$SCRIPT_PATH/ssl-inspect $2") > /dev/null
-    RC="$?"
-    [[ "$RC" == 0 ]] && echo "matched!" || echo "!matched"
-    return "$RC"
+	if [ -z "$1" ] || [ -z "$2" ]; then
+		echo >&2 "compare requires two args"
+		exit 1
+	fi
+	diff <(run "$SCRIPT_PATH/ssl-inspect $1") <(run "$SCRIPT_PATH/ssl-inspect $2") >/dev/null
+	RC="$?"
+	[[ "$RC" == 0 ]] && echo "matched!" || echo "!matched"
+	return "$RC"
 }
 
 case "$SCRIPT_NAME" in
-    ssl-inspect)
-        inspect "$1"
-        exit $?
-        ;;
-    ssl-sans)
-        sans "$1"
-        exit $?
-        ;;
-    ssl-validity)
-        validity "$1"
-        exit $?
-        ;;
-    ssl-compare)
-        compare "$1" "$2"
-        exit $?
-        ;;
-    *)
-        echo "unknown command"
-        echo "valid commands: ssl-inspect, ssl-sans, ssl-validity, ssl-compare"
-        exit 1
-        ;;
+ssl-inspect)
+	inspect "$1"
+	exit $?
+	;;
+ssl-sans)
+	sans "$1"
+	exit $?
+	;;
+ssl-validity)
+	validity "$1"
+	exit $?
+	;;
+ssl-compare)
+	compare "$1" "$2"
+	exit $?
+	;;
+*)
+	echo "unknown command"
+	echo "valid commands: ssl-inspect, ssl-sans, ssl-validity, ssl-compare"
+	exit 1
+	;;
 esac

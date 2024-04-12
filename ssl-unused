@@ -3,18 +3,16 @@
 # Summary:
 #  - Use autocert to list all domains we have SSL certs for
 #  - See if we can resolve each CN (common name)
-#  - If host resolution fails, the site may 
+#  - If host resolution fails, the site may
 # By Daniel Hartnell <dhartnell@mozilla.com>
 
 # This parses the autocert verbose output and gathers CNs
-DOMAINS=$(autocert ls -v1  | grep common_name | \
-  awk -F ': ' '{print $2}' | grep -v "^\'\*")
+DOMAINS=$(autocert ls -v1 | grep common_name |
+	awk -F ': ' '{print $2}' | grep -v "^\'\*")
 
-for domain in $DOMAINS
-do
-  host $domain > /dev/null 2>&1
-  if [ $? -ne 0 ]
-  then
-    echo "Unable to resolve host: $domain"
-  fi
+for domain in $DOMAINS; do
+	host $domain >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Unable to resolve host: $domain"
+	fi
 done
